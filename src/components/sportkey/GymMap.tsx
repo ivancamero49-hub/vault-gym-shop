@@ -136,7 +136,11 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}
-        <div key={mapId} ref={ref} className="absolute inset-0 z-10" />
+        <div
+          key={mapId}
+          ref={ref}
+          className={`absolute inset-0 z-10 transition-opacity duration-300 ${mapLoaded ? "opacity-100" : "opacity-0"}`}
+        />
         {!mapLoaded && gyms.map((g) => {
           const position = markerPosition(g);
           return (
