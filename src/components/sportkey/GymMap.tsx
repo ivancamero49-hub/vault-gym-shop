@@ -1,18 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useGyms, type Gym } from "@/lib/sportkey-data";
 import { getMapboxToken } from "@/server/config.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin } from "lucide-react";
-
-function hasWebGL(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl"));
-  } catch {
-    return false;
-  }
-}
 
 function GymList({ gyms, onSelect }: { gyms: Gym[]; onSelect: (g: Gym) => void }) {
   return (
@@ -40,36 +30,47 @@ function GymList({ gyms, onSelect }: { gyms: Gym[]; onSelect: (g: Gym) => void }
 }
 
 export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
+  const mapId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const gyms = useGyms();
   const fetchToken = useServerFn(getMapboxToken);
   const [token, setToken] = useState<string | null>(null);
-  const [mapFailed, setMapFailed] = useState(false);
-  const webglOk = typeof window !== "undefined" ? hasWebGL() : true;
 
   useEffect(() => { fetchToken().then((r) => setToken(r.token)).catch(() => setToken("")); }, [fetchToken]);
 
   useEffect(() => {
-    if (!token || !webglOk || !ref.current || mapRef.current) return;
+    if (!token || !ref.current) return;
     let cancelled = false;
     (async () => {
       try {
         const mapboxgl = (await import("mapbox-gl")).default;
         await import("mapbox-gl/dist/mapbox-gl.css");
         if (cancelled || !ref.current) return;
+
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        ref.current.replaceChildren();
         mapboxgl.accessToken = token;
+        mapboxgl.clearPrewarmedResources?.();
+        mapboxgl.clearStorage?.(() => undefined);
+        mapboxgl.prewarm?.();
+
         const map = new mapboxgl.Map({
           container: ref.current,
           style: "mapbox://styles/mapbox/dark-v11",
           center: [-64.6833, 10.1333], // Barcelona, Anzoátegui (Venezuela)
           zoom: 12,
           attributionControl: false,
+          failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: false,
+          antialias: false,
         });
         map.on("error", (e: any) => {
           // eslint-disable-next-line no-console
           console.warn("[mapbox]", e?.error?.message ?? e);
-          setMapFailed(true);
         });
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
         mapRef.current = map;
@@ -83,11 +84,16 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn("[mapbox] init failed", err);
-        setMapFailed(true);
       }
     })();
-    return () => { cancelled = true; };
-  }, [token, webglOk, gyms, onSelect]);
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [token, gyms, onSelect, mapId]);
 
   if (token === null) {
     return (
@@ -98,17 +104,14 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
     );
   }
 
-  if (!token || !webglOk || mapFailed) {
-    return (
-      <div className="space-y-3">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-          <MapPin className="h-3 w-3 text-primary" />
-          {!token ? "Mapa no configurado" : !webglOk ? "WebGL no disponible — vista en lista" : "Mapa no disponible"}
-        </div>
-        <GymList gyms={gyms} onSelect={onSelect} />
-      </div>
-    );
-  }
-
-  return <div ref={ref} className="h-[60vh] w-full rounded-2xl overflow-hidden border border-border" />;
+  return (
+    <div className="space-y-3">
+      <div
+        key={mapId}
+        ref={ref}
+        className="min-h-[360px] h-[60vh] max-h-[620px] w-full rounded-2xl overflow-hidden border border-border bg-card"
+      />
+      {!token && <GymList gyms={gyms} onSelect={onSelect} />}
+    </div>
+  );
 }
