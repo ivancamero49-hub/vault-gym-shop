@@ -4,6 +4,22 @@ import { getMapboxToken } from "@/server/config.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin } from "lucide-react";
 
+const BARCELONA_CENTER: [number, number] = [-64.6833, 10.1333];
+const MAP_ZOOM = 12;
+
+function markerPosition(gym: Gym) {
+  const project = (lng: number, lat: number) => {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    return { x: (lng + 180) / 360, y: 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI) };
+  };
+  const center = project(BARCELONA_CENTER[0], BARCELONA_CENTER[1]);
+  const point = project(gym.lng, gym.lat);
+  const scale = 512 * 2 ** MAP_ZOOM;
+  const x = 50 + ((point.x - center.x) * scale * 100) / 900;
+  const y = 50 + ((point.y - center.y) * scale * 100) / 700;
+  return { left: `${Math.max(8, Math.min(92, x))}%`, top: `${Math.max(8, Math.min(92, y))}%` };
+}
+
 function GymList({ gyms, onSelect }: { gyms: Gym[]; onSelect: (g: Gym) => void }) {
   return (
     <div className="space-y-2">
@@ -36,12 +52,14 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
   const gyms = useGyms();
   const fetchToken = useServerFn(getMapboxToken);
   const [token, setToken] = useState<string | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => { fetchToken().then((r) => setToken(r.token)).catch(() => setToken("")); }, [fetchToken]);
 
   useEffect(() => {
     if (!token || !ref.current) return;
     let cancelled = false;
+    setMapLoaded(false);
     (async () => {
       try {
         const mapboxgl = (await import("mapbox-gl")).default;
@@ -61,8 +79,8 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
         const map = new mapboxgl.Map({
           container: ref.current,
           style: "mapbox://styles/mapbox/dark-v11",
-          center: [-64.6833, 10.1333], // Barcelona, Anzoátegui (Venezuela)
-          zoom: 12,
+          center: BARCELONA_CENTER, // Barcelona, Anzoátegui (Venezuela)
+          zoom: MAP_ZOOM,
           attributionControl: false,
           failIfMajorPerformanceCaveat: false,
           preserveDrawingBuffer: false,
@@ -71,6 +89,10 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
         map.on("error", (e: any) => {
           // eslint-disable-next-line no-console
           console.warn("[mapbox]", e?.error?.message ?? e);
+        });
+        map.once("load", () => {
+          map.resize();
+          setMapLoaded(true);
         });
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
         mapRef.current = map;
