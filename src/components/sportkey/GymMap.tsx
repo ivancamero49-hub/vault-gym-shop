@@ -1,17 +1,23 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useGyms, type Gym } from "@/lib/sportkey-data";
 import { getMapboxToken } from "@/server/config.functions";
 import { useServerFn } from "@tanstack/react-start";
 import { Loader2, MapPin } from "lucide-react";
 
-function hasWebGL(): boolean {
-  if (typeof window === "undefined") return false;
-  try {
-    const c = document.createElement("canvas");
-    return !!(c.getContext("webgl2") || c.getContext("webgl") || c.getContext("experimental-webgl"));
-  } catch {
-    return false;
-  }
+const BARCELONA_CENTER: [number, number] = [-64.6833, 10.1333];
+const MAP_ZOOM = 12;
+
+function markerPosition(gym: Gym) {
+  const project = (lng: number, lat: number) => {
+    const sin = Math.sin((lat * Math.PI) / 180);
+    return { x: (lng + 180) / 360, y: 0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI) };
+  };
+  const center = project(BARCELONA_CENTER[0], BARCELONA_CENTER[1]);
+  const point = project(gym.lng, gym.lat);
+  const scale = 512 * 2 ** MAP_ZOOM;
+  const x = 50 + ((point.x - center.x) * scale * 100) / 900;
+  const y = 50 + ((point.y - center.y) * scale * 100) / 700;
+  return { left: `${Math.max(8, Math.min(92, x))}%`, top: `${Math.max(8, Math.min(92, y))}%` };
 }
 
 function GymList({ gyms, onSelect }: { gyms: Gym[]; onSelect: (g: Gym) => void }) {
@@ -40,36 +46,53 @@ function GymList({ gyms, onSelect }: { gyms: Gym[]; onSelect: (g: Gym) => void }
 }
 
 export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
+  const mapId = useId();
   const ref = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const gyms = useGyms();
   const fetchToken = useServerFn(getMapboxToken);
   const [token, setToken] = useState<string | null>(null);
-  const [mapFailed, setMapFailed] = useState(false);
-  const webglOk = typeof window !== "undefined" ? hasWebGL() : true;
+  const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => { fetchToken().then((r) => setToken(r.token)).catch(() => setToken("")); }, [fetchToken]);
 
   useEffect(() => {
-    if (!token || !webglOk || !ref.current || mapRef.current) return;
+    if (!token || !ref.current) return;
     let cancelled = false;
+    setMapLoaded(false);
     (async () => {
       try {
         const mapboxgl = (await import("mapbox-gl")).default;
         await import("mapbox-gl/dist/mapbox-gl.css");
         if (cancelled || !ref.current) return;
+
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        ref.current.replaceChildren();
         mapboxgl.accessToken = token;
+        mapboxgl.clearPrewarmedResources?.();
+        mapboxgl.clearStorage?.(() => undefined);
+        mapboxgl.prewarm?.();
+
         const map = new mapboxgl.Map({
           container: ref.current,
           style: "mapbox://styles/mapbox/dark-v11",
-          center: [-64.6833, 10.1333], // Barcelona, Anzoátegui (Venezuela)
-          zoom: 12,
+          center: BARCELONA_CENTER, // Barcelona, Anzoátegui (Venezuela)
+          zoom: MAP_ZOOM,
           attributionControl: false,
+          failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: false,
+          antialias: false,
         });
         map.on("error", (e: any) => {
           // eslint-disable-next-line no-console
           console.warn("[mapbox]", e?.error?.message ?? e);
-          setMapFailed(true);
+        });
+        map.once("load", () => {
+          map.resize();
+          setMapLoaded(true);
         });
         map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "top-right");
         mapRef.current = map;
@@ -83,11 +106,16 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
       } catch (err) {
         // eslint-disable-next-line no-console
         console.warn("[mapbox] init failed", err);
-        setMapFailed(true);
       }
     })();
-    return () => { cancelled = true; };
-  }, [token, webglOk, gyms, onSelect]);
+    return () => {
+      cancelled = true;
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [token, gyms, onSelect, mapId]);
 
   if (token === null) {
     return (
@@ -98,17 +126,37 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
     );
   }
 
-  if (!token || !webglOk || mapFailed) {
-    return (
-      <div className="space-y-3">
-        <div className="text-[11px] uppercase tracking-widest text-muted-foreground flex items-center gap-1">
-          <MapPin className="h-3 w-3 text-primary" />
-          {!token ? "Mapa no configurado" : !webglOk ? "WebGL no disponible — vista en lista" : "Mapa no disponible"}
-        </div>
-        <GymList gyms={gyms} onSelect={onSelect} />
+  return (
+    <div className="space-y-3">
+      <div className="relative min-h-[360px] h-[60vh] max-h-[620px] w-full rounded-2xl overflow-hidden border border-border bg-card">
+        {token && !mapLoaded && (
+          <img
+            src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${BARCELONA_CENTER[0]},${BARCELONA_CENTER[1]},${MAP_ZOOM},0/900x700?access_token=${token}`}
+            alt="Mapa de Barcelona, Anzoátegui"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+        <div
+          key={mapId}
+          ref={ref}
+          className={`absolute inset-0 z-10 transition-opacity duration-300 ${mapLoaded ? "opacity-100" : "opacity-0"}`}
+        />
+        {!mapLoaded && gyms.map((g) => {
+          const position = markerPosition(g);
+          return (
+            <button
+              key={g.id}
+              onClick={() => onSelect(g)}
+              className="absolute z-20 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary text-primary-foreground border-2 border-background grid place-items-center font-bold text-xs shadow-lg"
+              style={position}
+              aria-label={`Seleccionar ${g.name}`}
+            >
+              {g.level}
+            </button>
+          );
+        })}
       </div>
-    );
-  }
-
-  return <div ref={ref} className="h-[60vh] w-full rounded-2xl overflow-hidden border border-border" />;
+      {!token && <GymList gyms={gyms} onSelect={onSelect} />}
+    </div>
+  );
 }
