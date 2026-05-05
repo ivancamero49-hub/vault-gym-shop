@@ -62,8 +62,8 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
         const map = new mapboxgl.Map({
           container: ref.current,
           style: "mapbox://styles/mapbox/dark-v11",
-          center: [-3.7038, 40.4368],
-          zoom: 11.5,
+          center: [-64.6833, 10.1333], // Barcelona, Anzoátegui (Venezuela)
+          zoom: 12,
           attributionControl: false,
         });
         map.on("error", (e: any) => {
