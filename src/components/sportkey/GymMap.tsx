@@ -128,11 +128,30 @@ export function GymMap({ onSelect }: { onSelect: (g: Gym) => void }) {
 
   return (
     <div className="space-y-3">
-      <div
-        key={mapId}
-        ref={ref}
-        className="min-h-[360px] h-[60vh] max-h-[620px] w-full rounded-2xl overflow-hidden border border-border bg-card"
-      />
+      <div className="relative min-h-[360px] h-[60vh] max-h-[620px] w-full rounded-2xl overflow-hidden border border-border bg-card">
+        {token && !mapLoaded && (
+          <img
+            src={`https://api.mapbox.com/styles/v1/mapbox/dark-v11/static/${BARCELONA_CENTER[0]},${BARCELONA_CENTER[1]},${MAP_ZOOM},0/900x700?access_token=${token}`}
+            alt="Mapa de Barcelona, Anzoátegui"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        )}
+        <div key={mapId} ref={ref} className="absolute inset-0 z-10" />
+        {!mapLoaded && gyms.map((g) => {
+          const position = markerPosition(g);
+          return (
+            <button
+              key={g.id}
+              onClick={() => onSelect(g)}
+              className="absolute z-20 h-9 w-9 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary text-primary-foreground border-2 border-background grid place-items-center font-bold text-xs shadow-lg"
+              style={position}
+              aria-label={`Seleccionar ${g.name}`}
+            >
+              {g.level}
+            </button>
+          );
+        })}
+      </div>
       {!token && <GymList gyms={gyms} onSelect={onSelect} />}
     </div>
   );
