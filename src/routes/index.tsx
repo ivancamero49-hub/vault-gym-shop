@@ -1,18 +1,24 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { AuthGate } from "@/components/sportkey/AuthGate";
 import { Onboarding } from "@/components/sportkey/Onboarding";
-import { useProfile, useBalance, useGyms } from "@/lib/sportkey-data";
+import { useProfile, useBalance, useReservations, useOwnedGyms, type Gym } from "@/lib/sportkey-data";
+import { GymMap } from "@/components/sportkey/GymMap";
+import { ReserveDialog } from "@/components/sportkey/ReserveDialog";
+import { DynamicQR } from "@/components/sportkey/DynamicQR";
+import { ShopView } from "@/components/sportkey/ShopView";
+import { OwnerDashboard } from "@/components/sportkey/OwnerDashboard";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
-import { Home, QrCode, ShoppingBag, User, MapPin, LogOut, Loader2, Zap } from "lucide-react";
+import { Home, QrCode, ShoppingBag, User, LogOut, Loader2, Zap, Calendar, Building2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Sport Key — Red de gimnasios y marketplace" },
-      { name: "description", content: "Sport Key: accede a la red de gimnasios con QR dinámico, reserva por GPS y canjea créditos en la tienda." },
+      { name: "description", content: "Accede a la red de gimnasios con QR dinámico, reserva por GPS y canjea créditos en la tienda." },
     ],
   }),
   component: Page,
@@ -38,15 +44,14 @@ function App() {
   const [view, setView] = useState<View>("home");
 
   if (loading) return <div className="min-h-screen grid place-items-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
-
   if (!profile?.base_gym_id) return <Onboarding onDone={refresh} />;
 
   return (
     <main className="mx-auto max-w-md min-h-screen pb-24">
       <TopBar />
       {view === "home" && <HomeView />}
-      {view === "qr" && <QrView />}
-      {view === "shop" && <ShopPlaceholder />}
+      {view === "qr" && <DynamicQR />}
+      {view === "shop" && <ShopView />}
       {view === "profile" && <ProfileView />}
       <BottomNav view={view} setView={setView} />
     </main>
@@ -72,64 +77,50 @@ function TopBar() {
 }
 
 function HomeView() {
-  const gyms = useGyms();
-  const { profile } = useProfile();
+  const [selected, setSelected] = useState<Gym | null>(null);
+  const { refresh: refreshBal } = useBalance();
+  const { reservations, refresh: refreshRes } = useReservations();
+
   return (
     <section className="px-5 pt-6 space-y-5">
       <div>
         <h2 className="text-2xl font-bold">Cerca de ti</h2>
-        <p className="text-sm text-muted-foreground mt-1">Reserva en cualquier gimnasio de la red.</p>
+        <p className="text-sm text-muted-foreground mt-1">Toca un pin para reservar (10 créditos).</p>
       </div>
-      <div className="space-y-3">
-        {gyms.map((g) => {
-          const isBase = g.id === profile?.base_gym_id;
-          return (
-            <article key={g.id} className="p-4 rounded-2xl border border-border bg-card">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold truncate">{g.name}</h3>
-                    {isBase && <span className="text-[10px] px-2 py-0.5 rounded-full bg-primary text-primary-foreground font-bold uppercase tracking-wider">Base</span>}
-                  </div>
-                  <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                    <MapPin className="h-3 w-3" /> {g.address}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground mt-1">Nivel {g.level}</div>
-                </div>
-                <Button size="sm" disabled className="bg-primary/20 text-primary border border-primary/30">
-                  Reservar
-                </Button>
-              </div>
-            </article>
-          );
-        })}
-        <p className="text-xs text-muted-foreground text-center pt-2">
-          Mapa GPS y reservas: próxima fase.
-        </p>
+      <GymMap onSelect={setSelected} />
+
+      <div>
+        <div className="text-xs font-bold tracking-widest uppercase text-muted-foreground flex items-center gap-1 mb-2">
+          <Calendar className="h-3 w-3" /> Tus reservas
+        </div>
+        <div className="space-y-2">
+          {reservations.slice(0, 4).map((r) => (
+            <ReservationRow key={r.id} r={r} />
+          ))}
+          {reservations.length === 0 && <p className="text-xs text-muted-foreground py-2">Aún sin reservas.</p>}
+        </div>
       </div>
+
+      <ReserveDialog gym={selected} onClose={() => setSelected(null)} onDone={() => { refreshBal(); refreshRes(); }} />
     </section>
   );
 }
 
-function QrView() {
+function ReservationRow({ r }: { r: any }) {
+  const [name, setName] = useState<string>("");
+  useEffect(() => {
+    supabase.from("gyms").select("name").eq("id", r.gym_id).maybeSingle().then(({ data }) => setName((data as any)?.name ?? ""));
+  }, [r.gym_id]);
+  const date = new Date(r.slot_start);
+  const colors: Record<string, string> = { booked: "text-primary", used: "text-muted-foreground", cancelled: "text-destructive", expired: "text-muted-foreground" };
   return (
-    <section className="px-5 pt-10 text-center">
-      <div className="mx-auto h-64 w-64 rounded-3xl border border-border bg-card grid place-items-center">
-        <QrCode className="h-24 w-24 text-muted-foreground" />
+    <div className="p-3 rounded-xl border border-border bg-card flex items-center justify-between text-sm">
+      <div className="min-w-0">
+        <div className="font-semibold truncate">{name}</div>
+        <div className="text-xs text-muted-foreground">{date.toLocaleString("es-ES", { weekday: "short", hour: "2-digit", minute: "2-digit" })}</div>
       </div>
-      <h2 className="mt-6 text-xl font-bold">QR Dinámico</h2>
-      <p className="text-sm text-muted-foreground mt-1">Disponible en la siguiente fase.</p>
-    </section>
-  );
-}
-
-function ShopPlaceholder() {
-  return (
-    <section className="px-5 pt-10 text-center">
-      <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto" />
-      <h2 className="mt-4 text-xl font-bold">Tienda</h2>
-      <p className="text-sm text-muted-foreground mt-1">Próximamente: marketplace con créditos.</p>
-    </section>
+      <div className={`text-[10px] font-bold uppercase tracking-wider ${colors[r.status] ?? ""}`}>{r.status}</div>
+    </div>
   );
 }
 
@@ -137,6 +128,20 @@ function ProfileView() {
   const { profile } = useProfile();
   const { balance } = useBalance();
   const { user, signOut } = useAuth();
+  const ownedGyms = useOwnedGyms();
+  const [showOwner, setShowOwner] = useState(false);
+
+  if (showOwner) {
+    return (
+      <div>
+        <div className="px-5 pt-4">
+          <Button variant="outline" size="sm" onClick={() => setShowOwner(false)}>← Volver al perfil</Button>
+        </div>
+        <OwnerDashboard />
+      </div>
+    );
+  }
+
   return (
     <section className="px-5 pt-6 space-y-6">
       <div className="p-5 rounded-2xl border border-border bg-card">
@@ -149,6 +154,13 @@ function ProfileView() {
         <div className="text-4xl font-bold text-primary mt-1 tabular-nums">{balance}</div>
         <div className="text-xs text-muted-foreground mt-1">créditos disponibles</div>
       </div>
+
+      {ownedGyms.length > 0 && (
+        <Button variant="outline" onClick={() => setShowOwner(true)} className="w-full">
+          <Building2 className="h-4 w-4 mr-2" /> Panel de Dueño ({ownedGyms.length})
+        </Button>
+      )}
+
       <Button variant="outline" onClick={signOut} className="w-full">
         <LogOut className="h-4 w-4 mr-2" /> Cerrar sesión
       </Button>
