@@ -14,16 +14,222 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      credit_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          period_start: string
+          reason: string
+          ref_id: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          period_start?: string
+          reason: string
+          ref_id?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          period_start?: string
+          reason?: string
+          ref_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      gyms: {
+        Row: {
+          active: boolean
+          address: string
+          created_at: string
+          description: string | null
+          id: string
+          lat: number
+          level: number
+          lng: number
+          name: string
+          owner_id: string | null
+          photo_url: string | null
+        }
+        Insert: {
+          active?: boolean
+          address: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          lat: number
+          level?: number
+          lng: number
+          name: string
+          owner_id?: string | null
+          photo_url?: string | null
+        }
+        Update: {
+          active?: boolean
+          address?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          lat?: number
+          level?: number
+          lng?: number
+          name?: string
+          owner_id?: string | null
+          photo_url?: string | null
+        }
+        Relationships: []
+      }
+      plans: {
+        Row: {
+          active: boolean
+          id: string
+          max_gym_level: number
+          monthly_credits: number
+          name: string
+          price_cents: number
+          tier: Database["public"]["Enums"]["plan_tier"]
+        }
+        Insert: {
+          active?: boolean
+          id?: string
+          max_gym_level: number
+          monthly_credits: number
+          name: string
+          price_cents?: number
+          tier: Database["public"]["Enums"]["plan_tier"]
+        }
+        Update: {
+          active?: boolean
+          id?: string
+          max_gym_level?: number
+          monthly_credits?: number
+          name?: string
+          price_cents?: number
+          tier?: Database["public"]["Enums"]["plan_tier"]
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          base_gym_id: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          base_gym_id?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          base_gym_id?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_base_gym_fk"
+            columns: ["base_gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          id: string
+          plan_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          plan_id: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          id?: string
+          plan_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      [_ in never]: never
+      v_credit_balance: {
+        Row: {
+          balance: number | null
+          period_start: string | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "user" | "gym_owner" | "admin"
+      plan_tier: "bronce" | "plata" | "oro"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +356,9 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["user", "gym_owner", "admin"],
+      plan_tier: ["bronce", "plata", "oro"],
+    },
   },
 } as const
