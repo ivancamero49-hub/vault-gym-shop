@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      check_ins: {
+        Row: {
+          created_at: string
+          gym_id: string
+          id: string
+          reservation_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gym_id: string
+          id?: string
+          reservation_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string
+          id?: string
+          reservation_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_ins_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_reservation_id_fkey"
+            columns: ["reservation_id"]
+            isOneToOne: false
+            referencedRelation: "reservations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_ledger: {
         Row: {
           amount: number
@@ -43,6 +82,41 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      gym_funds: {
+        Row: {
+          amount: number
+          created_at: string
+          gym_id: string
+          id: string
+          reason: string
+          ref_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          gym_id: string
+          id?: string
+          reason: string
+          ref_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          gym_id?: string
+          id?: string
+          reason?: string
+          ref_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_funds_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       gyms: {
         Row: {
@@ -86,6 +160,89 @@ export type Database = {
         }
         Relationships: []
       }
+      order_items: {
+        Row: {
+          id: string
+          order_id: string
+          product_id: string
+          qty: number
+          unit_cash_cents: number
+          unit_credits: number
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          product_id: string
+          qty: number
+          unit_cash_cents?: number
+          unit_credits?: number
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          product_id?: string
+          qty?: number
+          unit_cash_cents?: number
+          unit_credits?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          created_at: string
+          gym_id: string | null
+          id: string
+          pickup_code: string
+          status: string
+          total_cash_cents: number
+          total_credits: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          pickup_code: string
+          status?: string
+          total_cash_cents?: number
+          total_credits?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          gym_id?: string | null
+          id?: string
+          pickup_code?: string
+          status?: string
+          total_cash_cents?: number
+          total_credits?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       plans: {
         Row: {
           active: boolean
@@ -116,6 +273,53 @@ export type Database = {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          gym_id: string | null
+          id: string
+          image_url: string | null
+          name: string
+          price_cash_cents: number
+          price_credits: number
+          stock: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          gym_id?: string | null
+          id?: string
+          image_url?: string | null
+          name: string
+          price_cash_cents?: number
+          price_credits?: number
+          stock?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          gym_id?: string | null
+          id?: string
+          image_url?: string | null
+          name?: string
+          price_cash_cents?: number
+          price_credits?: number
+          stock?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -145,6 +349,44 @@ export type Database = {
           {
             foreignKeyName: "profiles_base_gym_fk"
             columns: ["base_gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reservations: {
+        Row: {
+          created_at: string
+          credits_cost: number
+          gym_id: string
+          id: string
+          slot_start: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          credits_cost?: number
+          gym_id: string
+          id?: string
+          slot_start: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          credits_cost?: number
+          gym_id?: string
+          id?: string
+          slot_start?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reservations_gym_id_fkey"
+            columns: ["gym_id"]
             isOneToOne: false
             referencedRelation: "gyms"
             referencedColumns: ["id"]
@@ -216,6 +458,37 @@ export type Database = {
           user_id: string | null
         }
         Relationships: []
+      }
+      v_gym_fund_balance: {
+        Row: {
+          balance: number | null
+          gym_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gym_funds_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      v_gym_visits_daily: {
+        Row: {
+          day: string | null
+          gym_id: string | null
+          visits: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_ins_gym_id_fkey"
+            columns: ["gym_id"]
+            isOneToOne: false
+            referencedRelation: "gyms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
