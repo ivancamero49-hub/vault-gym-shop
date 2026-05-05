@@ -71,6 +71,19 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
         {selectedPlan && (
           <section className="space-y-3">
             <h2 className="text-xs font-bold tracking-[0.2em] uppercase text-muted-foreground">2 · Gimnasio Base</h2>
+
+            <a
+              href="#mapa-gimnasios"
+              className="block w-full text-center py-4 rounded-2xl bg-primary text-primary-foreground font-bold text-base shadow-glow hover:bg-primary/90 transition-all"
+            >
+              <MapPin className="inline h-5 w-5 mr-2 -mt-1" />
+              Ir al Mapa
+            </a>
+
+            <div id="mapa-gimnasios" className="rounded-2xl overflow-hidden">
+              <GymMap onSelect={(g) => { if (g.level <= selectedPlan.max_gym_level) setGymId(g.id); }} />
+            </div>
+
             {eligibleGyms.map((g) => {
               const sel = gymId === g.id;
               return (
