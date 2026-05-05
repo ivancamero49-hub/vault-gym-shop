@@ -6,6 +6,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { subscribeUser } from "@/server/subscriptions.functions";
 import { toast } from "sonner";
 import { Check, Loader2, MapPin } from "lucide-react";
+import { GymMap } from "@/components/sportkey/GymMap";
 
 export function Onboarding({ onDone }: { onDone: () => void }) {
   const { user } = useAuth();
